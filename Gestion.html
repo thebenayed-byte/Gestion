@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Gestion Boutique PRO</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+    font-family: Arial;
+    background:#0f172a;
+    color:white;
+    text-align:center;
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+}
+
+input,button{
+    padding:10px;
+    margin:5px;
+    border-radius:8px;
+    border:none;
+}
+
+button{
+    background:#22c55e;
+    color:white;
+    cursor:pointer;
+}
+
+.reset{
+    background:red;
+}
+
+.card{
+    background:#1e293b;
+    padding:15px;
+    margin:10px;
+    border-radius:10px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📊 Gestion Boutique PRO</h1>
+
+<!-- PRODUIT -->
+<div class="card">
+<h2>📦 Ajouter / Modifier Produit</h2>
+
+<input id="nom" placeholder="Nom produit">
+<input id="prixAchat" type="number" placeholder="Prix achat">
+<input id="prixVente" type="number" placeholder="Prix vente">
+<input id="stock" type="number" placeholder="Stock initial">
+
+<button onclick="ajouterProduit()">Enregistrer produit</button>
+</div>
+
+<!-- VENTE -->
+<div class="card">
+<h2>💸 Vente</h2>
+
+<input id="nomVente" placeholder="Nom produit">
+<input id="qteVente" type="number" placeholder="Quantité">
+
+<button onclick="vendre()">Vendre</button>
+</div>
+
+<!-- RESUME -->
+<div class="card">
+<h2>💰 Résumé</h2>
+<p>Investissement: <span id="invest">0</span></p>
+<p>Recettes: <span id="recette">0</span></p>
+<p>Bénéfice: <span id="benefice">0</span></p>
+<p>📦 Stock total: <span id="stockTotal">0</span></p>
+</div>
+
+<!-- PRODUITS -->
+<div class="card">
+<h2>📦 Produits</h2>
+<div id="produits"></div>
+</div>
+
+<!-- HISTORIQUE -->
+<div class="card">
+<h2>📜 Historique</h2>
+<div id="historique"></div>
+</div>
+
+<!-- CALCULATRICE -->
+<div class="card">
+<h2>🧮 Calculatrice</h2>
+<input id="calcInput" placeholder="Ex: 1000+250*2">
+<button onclick="calculer()">Calculer</button>
+<p>Résultat: <span id="calcResult">0</span></p>
+</div>
+
+<!-- SIMULATION -->
+<div class="card">
+<h2>📈 Simulation profit</h2>
+
+<input id="simAchat" type="number" placeholder="Prix achat">
+<input id="simVente" type="number" placeholder="Prix vente">
+<input id="simQte" type="number" placeholder="Quantité">
+
+<button onclick="simuler()">Simuler</button>
+
+<p>💰 Total: <span id="simTotal">0</span></p>
+<p>📊 Unité: <span id="simUnite">0</span></p>
+</div>
+
+<!-- ACTIONS -->
+<div class="card">
+
+<button onclick="enregistrer()">💾 Enregistrer</button>
+<button onclick="exporter()">📤 Export JSON</button>
+<button onclick="importer()">📥 Import JSON</button>
+<input type="file" id="fileInput" style="display:none" onchange="chargerFichier(event)">
+
+<button onclick="exportPDF()">📄 Export PDF</button>
+
+</div>
+
+<button class="reset" onclick="resetAll()">🔄 Réinitialiser</button>
+
+</div>
+
+<script>
+
+let data = JSON.parse(localStorage.getItem("boutique")) || {
+    produits:{},
+    investissement:0,
+    recette:0,
+    historique:[]
+};
+
+function save(){
+    localStorage.setItem("boutique", JSON.stringify(data));
+}
+
+/* AJOUT PRODUIT */
+function ajouterProduit(){
+    let nom=document.getElementById("nom").value;
+    let achat=Number(document.getElementById("prixAchat").value);
+    let vente=Number(document.getElementById("prixVente").value);
+    let stock=Number(document.getElementById("stock").value);
+
+    if(!nom || !achat || !vente) return alert("Remplis les champs");
+
+    data.produits[nom]={
+        stock:stock,
+        achat:achat,
+        ventePrix:vente
+    };
+
+    save();
+    afficher();
+}
+
+/* VENTE */
+function vendre(){
+    let nom=document.getElementById("nomVente").value;
+    let qte=Number(document.getElementById("qteVente").value);
+
+    let p=data.produits[nom];
+    if(!p) return alert("Produit inexistant");
+    if(p.stock<qte) return alert("Stock insuffisant");
+
+    let benef=(p.ventePrix-p.achat)*qte;
+
+    p.stock-=qte;
+
+    data.investissement += p.achat*qte;
+    data.recette += p.ventePrix*qte;
+
+    data.historique.push({
+        nom,
+        qte,
+        benef,
+        date:new Date().toLocaleString()
+    });
+
+    save();
+    afficher();
+
+    alert("💰 Bénéfice: "+benef.toFixed(0));
+}
+
+/* AFFICHAGE */
+function afficher(){
+
+    let div=document.getElementById("produits");
+    div.innerHTML="";
+
+    let stockTotal=0;
+    let benefTotal=data.recette-data.investissement;
+
+    for(let nom in data.produits){
+        let p=data.produits[nom];
+        stockTotal+=p.stock;
+
+        div.innerHTML+=`
+        <p>
+        <b>${nom}</b><br>
+        📦 Stock: ${p.stock}<br>
+        💰 Achat: ${p.achat} | Vente: ${p.ventePrix}
+        </p>`;
+    }
+
+    document.getElementById("invest").innerText=data.investissement;
+    document.getElementById("recette").innerText=data.recette;
+    document.getElementById("benefice").innerText=benefTotal;
+    document.getElementById("stockTotal").innerText=stockTotal;
+
+    let hist=document.getElementById("historique");
+    hist.innerHTML="";
+
+    data.historique.slice().reverse().forEach(v=>{
+        hist.innerHTML+=`
+        <p>${v.date} | ${v.nom} | Qté:${v.qte} | 💰${v.benef.toFixed(0)}</p>`;
+    });
+}
+
+/* CALCULATRICE */
+function calculer(){
+    try{
+        document.getElementById("calcResult").innerText=
+        eval(document.getElementById("calcInput").value);
+    }catch{
+        alert("Erreur");
+    }
+}
+
+/* SIMULATION */
+function simuler(){
+    let a=Number(document.getElementById("simAchat").value);
+    let v=Number(document.getElementById("simVente").value);
+    let q=Number(document.getElementById("simQte").value);
+
+    document.getElementById("simUnite").innerText=v-a;
+    document.getElementById("simTotal").innerText=(v-a)*q;
+}
+
+/* ACTIONS */
+function enregistrer(){
+    save();
+    alert("Sauvegardé !");
+}
+
+function exporter(){
+    let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    let url=URL.createObjectURL(blob);
+    let a=document.createElement("a");
+    a.href=url;
+    a.download="boutique.json";
+    a.click();
+}
+
+function importer(){
+    document.getElementById("fileInput").click();
+}
+
+function chargerFichier(e){
+    let file=e.target.files[0];
+    let reader=new FileReader();
+
+    reader.onload=function(ev){
+        data=JSON.parse(ev.target.result);
+        save();
+        afficher();
+    };
+
+    reader.readAsText(file);
+}
+
+/* PDF */
+function exportPDF(){
+    const {jsPDF}=window.jspdf;
+    let doc=new jsPDF();
+
+    let y=10;
+
+    doc.text("RAPPORT BOUTIQUE",10,y); y+=10;
+    doc.text("Date: "+new Date().toLocaleString(),10,y); y+=10;
+
+    doc.text("Invest: "+data.investissement,10,y); y+=8;
+    doc.text("Recette: "+data.recette,10,y); y+=8;
+    doc.text("Benefice: "+(data.recette-data.investissement),10,y); y+=10;
+
+    doc.text("HISTORIQUE:",10,y); y+=8;
+
+    data.historique.forEach(v=>{
+        doc.text(`${v.date} ${v.nom} ${v.qte} ${v.benef.toFixed(0)}`,10,y);
+        y+=8;
+        if(y>270){doc.addPage();y=10;}
+    });
+
+    doc.save("rapport.pdf");
+}
+
+/* RESET */
+function resetAll(){
+    if(confirm("Tout supprimer ?")){
+        localStorage.removeItem("boutique");
+        location.reload();
+    }
+}
+
+afficher();
+
+</script>
+
+</body>
+</html>
